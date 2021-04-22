@@ -1,0 +1,7 @@
+.vscode
+.tmp
+**/cur
+**/node_modules
+**/cur_brightness
+**/cur_temp
+**/100]

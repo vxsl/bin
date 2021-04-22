@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [[ $(git rev-parse --absolute-git-dir 2>/dev/null) && $(git rev-parse --absolute-git-dir 2>/dev/null) != "$HOME/.dotfiles-bare" ]]; then
+    # this is a regular repo
+    STAGED=$(git diff --cached --numstat | wc -l)
+    if [ $STAGED -gt 0 ]; then
+        git reset
+    else
+        git add -A
+    fi
+else
+    # this is not a repo, assume dotfiles
+    STAGED=$(dotfiles git diff --cached --numstat | wc -l)
+    if [ $STAGED -gt 0 ]; then
+        dotfiles git reset
+    else
+        dotfiles git add -u
+    fi
+fi

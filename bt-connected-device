@@ -1,0 +1,5 @@
+#!/bin/bash
+
+if $(bluetoothctl info | grep -q "Connected: yes"); then
+    echo $(bluetoothctl info | grep -B 7 "Connected: yes" | head -n 1 | awk -F ": " '{print $2}') "" 
+fi

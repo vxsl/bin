@@ -1,0 +1,13 @@
+xsetwacom set "Wacom Intuos BT M Pad pad" Button 1 key "l"
+xsetwacom set "Wacom Intuos BT M Pad pad" Button 2 key "ctrl" "z"
+xsetwacom set "Wacom Intuos BT M Pad pad" Button 3 ""
+xsetwacom set "Wacom Intuos BT M Pad pad" Button 4 ""
+xsetwacom set "Wacom Intuos BT M Pad pad" Button 5 ""
+xsetwacom set "Wacom Intuos BT M Pad pad" Button 6 ""
+xsetwacom set "Wacom Intuos BT M Pad pad" Button 7 ""
+xsetwacom set "Wacom Intuos BT M Pad pad" Button 8 ""
+xsetwacom set "Wacom Intuos BT M Pen stylus" MapToOutput "DVI-I-0"
+
+xsetwacom set "Wacom Intuos BT M Pen stylus" Button 2 "button 42"
+xsetwacom set "Wacom Intuos BT M Pen stylus" Button 3 "button 42"
+# xsetwacom set "Wacom Intuos BT M Pen stylus" Button 1 "button 42"

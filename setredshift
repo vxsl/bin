@@ -1,0 +1,75 @@
+#!/bin/sh
+
+DIRNAME="$(dirname "$0")/.tmp"
+mkdir -p "$DIRNAME"
+
+if [ ! -e "$DIRNAME/cur_brightness" ]; then
+    echo 1 > "$DIRNAME/cur_brightness"
+fi
+
+if [ ! -e "$DIRNAME/cur_temp" ]; then
+    echo 6500 > "$DIRNAME/cur_temp"
+fi
+
+curbrightness=$(cat $DIRNAME/cur_brightness)
+curtemp=$(cat $DIRNAME/cur_temp)
+
+if [[ ("$1" == "--reset") ]]; then
+    redshift -x
+    echo 1 > $DIRNAME/cur_brightness
+    echo 6500 > $DIRNAME/cur_temp
+    exit 0
+fi
+
+while getopts ":b:t:" opt; do
+    case $opt in
+        b) arg_1="$OPTARG"
+            
+            INCR=0.1
+            if [[ ("$1" == "-bi") ]]; then
+                new=$(echo "$curbrightness+$INCR" | bc)
+                valid=$(echo "$new >= 0 && $new <= 1" | bc)
+                echo $new
+                elif [[ ("$1" == "-bd") ]]; then
+                new=$(echo "$curbrightness-$INCR" | bc)
+                valid=$(echo "$new >= 0 && $new <= 1" | bc)
+                elif [[ ("$1" == "-br") ]]; then
+                new=1
+                valid=1
+            fi
+            if [[ $valid -eq 1 ]]; then
+                redshift -P -O  $curtemp -b $new
+                echo $new > $DIRNAME/cur_brightness
+            fi
+        ;;
+        t) p_out="$OPTARG"
+            INCR=500
+            if [[ ("$1" == "-tr") ]]; then
+                redshift -x
+                redshift -P -O $curtemp
+                exit 0
+            fi
+            
+            echo $curtemp
+            below_threshold=$(echo "$curtemp <= 1500" | bc)
+            if [[ $below_threshold -eq 1 ]]; then
+                INCR=100
+            fi
+            if [[ ("$1" == "-ti") ]]; then
+                new=$(echo "$curtemp+$INCR" | bc)
+                elif [[ ("$1" == "-td") ]]; then
+                new=$(echo "$curtemp-$INCR" | bc)
+            fi
+            
+            echo $new
+            valid=$(echo "$new >= 0 && $new <= 6500" | bc)
+            
+            if [[ $valid -eq 1 ]]; then
+                redshift -P -O $new -b $curbrightness
+                echo $new > $DIRNAME/cur_temp
+            fi
+        ;;
+        \?) echo "Invalid option -$OPTARG" >&2
+        ;;
+    esac
+done

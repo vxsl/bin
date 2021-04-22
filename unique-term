@@ -1,0 +1,3 @@
+#!/bin/bash
+
+alacritty --class "$1" -e sh -c "$2"

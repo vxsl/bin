@@ -1,0 +1,23 @@
+#!/bin/bash
+
+#======================================================
+print_usage() {
+    echo "Usage: $0 <mac_address>"
+}
+if [ "$#" -ne 1 ]; then
+    print_usage
+    exit 1
+fi
+#------------------------------------------------------
+
+dev="$1"
+sudo systemctl restart bluetooth
+sleep 5
+bluetoothctl remove $dev
+bluetoothctl power on
+bluetoothctl scan on >/dev/null
+sleep 3
+bluetoothctl trust $dev
+bluetoothctl pair $dev
+bluetoothctl connect $dev
+bluetoothctl scan off

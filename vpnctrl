@@ -1,0 +1,37 @@
+#!/bin/bash
+
+VPN_NAME="$1"
+PASSWD_PATH="/tmp/$1.vpnpasswd"
+
+if [ $# -ne 2 ]; then
+    echo "usage: vpnctrl <vpn-name> <--up|--down>"
+    exit 1
+fi
+
+trap "rm -f $PASSWD_PATH" EXIT
+if [[ ("$2" == "--up") ]]; then
+    if [[ $(nmcli c s -a | grep $VPN_NAME) ]]; then
+        notify-send "$VPN_NAME is already active."
+        exit
+    fi
+    PASSWD=$(zenity --password)
+    if [[ "$?" != "0" ]]; then
+        notify-send "VPN connection cancelled."
+        exit 1
+    fi
+    echo -n "vpn.secrets.password:$PASSWD" >$PASSWD_PATH
+    AUTH_CODE=$(zenity --entry --text="Enter auth code")
+    if [[ "$?" != "0" ]]; then
+        notify-send "VPN connection cancelled."
+        exit 1
+    fi
+    echo -n "$AUTH_CODE" >>$PASSWD_PATH
+    cat $PASSWD_PATH
+    notify-send --urgency=critical "$(nmcli c up $VPN_NAME passwd-file $PASSWD_PATH 2>&1)"
+    elif [[ ("$2" == "--down") ]]; then
+    if [[ -z $(nmcli c s -a | grep $VPN_NAME) ]]; then
+        notify-send "$VPN_NAME is already inactive."
+        exit
+    fi
+    notify-send --urgency=critical "$(nmcli c down $VPN_NAME 2>&1)"
+fi

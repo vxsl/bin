@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Convenience script to find and display the X window IDs that match both a specified class name ($1) and a specified window name ($2).
+
+if [ $# -eq 2 ]; then
+    comm -12 \
+    <(xdotool search --classname "$1" | sort) \
+    <(xdotool search --name "$2" | sort)
+else
+    echo "usage: xdotool-multi-search <classname> <name>"
+fi

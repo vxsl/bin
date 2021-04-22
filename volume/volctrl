@@ -1,0 +1,57 @@
+#!/bin/sh
+
+#======================================================
+print_usage() {
+    echo "Usage: $0 -u[c|f] | -d[c|f] [<application_name>]"
+    echo "  -u         : Set volume up"
+    echo "  -d         : Set volume down"
+    echo "  -dc | -df  : Set volume down (c: coarse, f: fine)"
+    echo "  -uc | -uf  : Set volume up (c: coarse, f: fine)"
+    echo "  [<application_name>] : Optional application name"
+}
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+    print_usage
+    exit 1
+fi
+case "$1" in
+    -u | -uc | -uf | -d | -dc | -df)
+        direction="${1:0:2}"
+        modifier="${1:2}"
+        app="$2"
+    ;;
+    *)
+        echo "Invalid first argument."
+        print_usage
+        exit 1
+    ;;
+esac
+#------------------------------------------------------
+
+if [ -z "$app" ]; then
+    cur=$(getvol)
+else
+    cur=$(getvol "$app")
+fi
+
+if [[ ("$modifier" == "c") ]]; then
+    INCR=5
+    elif [[ ("$modifier" == "f") ]]; then
+    INCR=1
+else
+    INCR=2
+fi
+
+if [[ ("$direction" == "-u") ]]; then
+    newvol=$(echo "$cur + $INCR" | bc)
+else
+    newvol=$(echo "$cur - $INCR" | bc)
+fi
+
+if [[ $(echo "$newvol > 100" | bc) = 1 ]]; then
+    newvol=100
+fi
+if [[ $(echo "$newvol < 0" | bc) = 1 ]]; then
+    newvol=0
+fi
+
+setvol $newvol $app

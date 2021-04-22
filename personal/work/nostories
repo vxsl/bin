@@ -1,0 +1,12 @@
+#!/bin/bash
+
+cd $HOME/work/gui/site
+find src -type f -name "*.stories.tsx" |
+  while read file; do
+    {
+      echo "//@ts-nocheck"
+      cat $file
+    } >tmp.$$
+    cp tmp.$$ $file
+    rm -f tmp.$$
+  done

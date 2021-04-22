@@ -1,0 +1,3 @@
+#!/bin/bash
+
+cd $HOME/work/gui/site && yarn launch:ncsvf

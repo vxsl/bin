@@ -1,0 +1,4 @@
+#!/bin/bash
+
+bluetoothctl power on
+bluetoothctl connect 38:18:4C:F9:91:6A

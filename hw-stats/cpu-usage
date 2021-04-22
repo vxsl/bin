@@ -1,0 +1,3 @@
+#!/bin/bash
+echo $(mpstat | tail -n 1 | awk -F 'all' '{print $2}' | awk -F' {2,}' '{print $2}')%
+

@@ -1,0 +1,140 @@
+#!/bin/bash
+if pgrep -x "firefox" >/dev/null; then
+    echo "Error: End Firefox processes before proceeding."
+    exit 1
+fi
+
+alt_colors=(
+    "#071120"
+    "#15223F"
+    "#16335F"
+    "#0B4685"
+    "#0D5A87"
+)
+alt_colors_provided=${#alt_colors[@]}
+
+darken_color() {
+    color_hex=$1
+    percentage=${2:-20}  # Default to 20% darkening if not specified
+    
+    # Extract individual color components
+    red=${color_hex:1:2}
+    green=${color_hex:3:2}
+    blue=${color_hex:5:2}
+    
+    # Convert hex to decimal and calculate darkened values
+    decimal_red=$((16#$red))  # Convert hex to decimal
+    darkened_decimal_red=$((decimal_red * (100 - percentage) / 100))
+    
+    decimal_green=$((16#$green))
+    darkened_decimal_green=$((decimal_green * (100 - percentage) / 100))
+    
+    decimal_blue=$((16#$blue))
+    darkened_decimal_blue=$((decimal_blue * (100 - percentage) / 100))
+    
+    # Format darkened color in hex
+    darkened_color="#$(printf "%02X%02X%02X" $darkened_decimal_red $darkened_decimal_green $darkened_decimal_blue)"
+    
+    echo $darkened_color
+}
+
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+    echo "Usage: $0 <desired_num_clones> [--reset]"
+    exit 1
+fi
+
+ff_dir="$HOME/.mozilla/firefox"
+
+
+desired_num_clones="$1"
+profile_title="default-release"
+existing_profile_pattern="*.$profile_title"
+
+# Check if the base profile exists
+existing_profile=$(find "$ff_dir/" -maxdepth 1 -type d -name "$existing_profile_pattern" -print -quit)
+
+if [ -z "$existing_profile" ]; then
+    echo "Error: Existing profile not found matching the pattern '$existing_profile_pattern'."
+    exit 1
+fi
+
+existing_profile_name=$(basename "$existing_profile")
+profiles_ini="$ff_dir/profiles.ini"
+
+# Function to find the next available profile number
+get_next_profile_number() {
+    used_numbers=$(awk -F= '/^\[Profile[0-9]+\]/{print $1}' "$profiles_ini" | grep -oP '\d+')
+    next_number=1
+    
+    while [[ $used_numbers =~ (^|[[:space:]])$next_number($|[[:space:]]) ]]; do
+        ((next_number++))
+    done
+    
+    echo "$next_number"
+}
+
+# Function to find the next available clone number
+get_num_clones() {
+    existing_clones=$(ls -1d "$ff_dir/$profile_title.clone"* 2>/dev/null)
+    existing_numbers=($(echo "$existing_clones" | grep -oP '\d+' | sort -n))
+    existing_clones=$(echo $existing_numbers | wc -l)
+    res=1
+    
+    for number in "${existing_numbers[@]}"; do
+        if [ "$number" -ne "$res" ]; then
+            break
+        fi
+        ((res++))
+    done
+    
+    ((res--))
+    echo "$res"
+}
+
+if [ "$#" -eq 2 ] && [ "$2" == "--reset" ]; then
+    find "$ff_dir" -maxdepth 1 -type d -name 'clone*' -exec rm -rf {} \;
+fi
+
+num_clones=$(get_num_clones)
+
+diff=$((desired_num_clones - num_clones))
+
+# Create clones if they don't exist
+for ((i=1; i<=$diff; i++)); do
+    next_profile_number=$(get_next_profile_number)
+    next_clone_number=$((num_clones + i))
+    clone_name="clone$next_clone_number"
+    
+    # Create a duplicate of the existing profile
+    clone_path="$ff_dir/$clone_name"
+    cp -r "$existing_profile" "$clone_path"
+    
+    color_index=$(((i-1) % alt_colors_provided))
+    color=${alt_colors[color_index]}
+    darkened=$(darken_color "$color")
+    
+    mkdir -p $clone_path/chrome
+    stylesheet="$clone_path/chrome/userChrome.css"
+    
+    echo "
+    #TabsToolbar {
+    background-color: $color !important;
+    }
+
+    .tab-background[selected] {
+    background: $darkened !important;
+    background-image: none !important;
+    }" >$stylesheet
+    
+    if ! grep -q "Name=$clone_name" "$profiles_ini"; then
+        {
+            echo "[Profile$next_profile_number]"
+            echo "Name=$clone_name"
+            echo "IsRelative=1"
+            echo "Path=$clone_name"
+            echo ""
+            cat "$profiles_ini"
+        } > "$profiles_ini.tmp"
+        mv "$profiles_ini.tmp" "$profiles_ini"
+    fi
+done

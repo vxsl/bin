@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# WARNING: This script is untested and may not work as expected.
+# Left here for reference only, incase redshift is not available.
+# Prefer 'setredshift' over this script.
+
+if [ $# -eq 1 ]; then
+    INCR=0.1
+    
+    outputs=$(xrandr --verbose | grep connected | cut -d' ' -f1)
+    vals=$(xrandr --verbose | grep Brightness | cut -d':' -f2)
+    curVal=$(echo "$vals" | head -n 1)
+    range=$(echo "$outputs" | wc -l)
+    if [[ ("$1" == "-i") ]]; then
+        newVal=$(echo "$curVal+$INCR" | bc)
+        valid=$(echo "$newVal >= 0 && $newVal <= 1" | bc)
+        elif [[ ("$1" == "-d") ]]; then
+        newVal=$(echo "$curVal-$INCR" | bc)
+        valid=$(echo "$newVal >= 0 && $newVal <= 1" | bc)
+        elif [[ ("$1" == "--reset") ]]; then
+        newVal=1
+        valid=1
+    fi
+    if [[ $valid -eq 1 ]]; then
+        for ((i=1; i <= $range; i++))
+        do
+            cur=$(echo "$outputs" | head -n $i | tail -n 1)
+            xrandr --output $cur --brightness $newVal
+        done
+    fi
+fi

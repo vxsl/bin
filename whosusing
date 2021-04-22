@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Convenience script for determining which process is using a given port
+#
+# > whosusing 5173
+# 758489
+# node-20
+
+
+PORT=$1
+PROC=$(lsof -i :$PORT | head -2 | tail -1 | awk '{print $2}')
+
+if [[ ("$2" == "-k") ]]; then
+    echo $PROC
+    procname $PROC
+    kill -9 $PROC
+    whosusing $PROC
+else
+    if [ ! -z "$PROC" ]; then
+        echo $PROC
+        procname $PROC
+    fi
+fi

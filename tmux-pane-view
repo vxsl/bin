@@ -1,0 +1,60 @@
+#!/bin/bash
+
+cached_client="/tmp/tmux-pane-view-client"
+
+if [ "$1" == "--target-current-pane" ]; then
+    view_client=$(cat $cached_client)
+    parent_pane=$(tmux display -p "#{pane_id}")
+    child_session=""$parent_pane"_child:"
+    if [ -n "$view_client" ]; then
+        tmux switch-client -c "$view_client" -t "$child_session"
+    fi
+    exit 0
+fi
+
+if [ "$1" == "--pane-to-session" ]; then
+    parent_pane="$TMUX_PANE"
+    child_session=\"$parent_pane\"_child
+    
+    TMUX= tmux new-session \; \
+    setw focus-events on \; \
+    setw pane-focus-out 'set -p window-active-style bg=#101010' \; \
+    setw pane-focus-in 'set -p window-active-style bg=black' \; \
+    send-keys "tmux rename-session $child_session" Enter \; \
+    bind-key -n M-Space run-shell 'p=#{pane_id}; tmux copy-mode -t "${p}_child:"' \; \
+    send-keys C-l
+    
+    exit 0
+fi
+
+if [ "$1" == "--open-view" ]; then
+    sessions=$(tmux list-sessions -F "#{session_name} #{pane_height} #{pane_width}")
+    
+    # initially attach the view to the widest pane:
+    max_width=0
+    while read -r line; do
+        if [[ $line == *"_child"* ]]; then
+            width=$(echo "$line" | awk '{print $3}')
+            if (( width > max_width )); then
+                max_width=$width
+                widest=$(echo "$line" | awk '{print $1}')
+            fi
+        fi
+    done <<< "$sessions"
+    
+    alacritty -o font.size=14 --class tmux-pane-view -e sh -c \
+    "tmux-pane-view --record-client-id && tmux attach-session -t \"$widest:\"" \
+    ; sudo rm -f $cached_client
+    exit 0
+fi
+
+if [ "$1" == "--record-client-id" ]; then
+    tmp_sess="tmux-pane-view-tmp-session"
+    tmux new-session -s $tmp_sess \
+    "tmux list-clients -F '#{client_name} #{client_session}' \
+    | grep -w $tmp_sess \
+    | awk '{print \$1}' \
+    >$cached_client \
+    && sleep 0.1 && tmux detach"
+    exit 0
+fi

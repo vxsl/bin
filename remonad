@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# https://stackoverflow.com/a/73271546
+tmp=$(mktemp -d)
+touch $tmp/xmessage
+chmod +x $tmp/xmessage
+if PATH="$tmp:$PATH" xmonad --recompile; then
+    if [[ ("$1" == "--restart") ]]; then
+        xmonad --restart
+    fi
+fi

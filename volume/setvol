@@ -1,0 +1,22 @@
+#!/bin/bash
+
+#======================================================
+print_usage() {
+    echo "Usage: $0 <vol> [<application_name>]"
+    echo "  <vol>      : Desired volume (0-100)"
+    echo "  [<application_name>] : Optional application name"
+}
+if [ "$#" -gt 2 ]; then
+    print_usage
+    exit 1
+fi
+#------------------------------------------------------
+
+if [ "$#" -eq 2 ]; then
+    sink=$(get-pulseaudio-sink "$2")
+else
+    sink="@DEFAULT_SINK@"
+fi
+
+pactl set-sink-volume $sink $1%
+volnoti-show $1

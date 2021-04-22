@@ -1,0 +1,13 @@
+#!/bin/bash
+
+DEVICE="WH-1000XM3"
+CARD="bluez_card.38_18_4C_F9_91_6A"
+PROFILE1="headset_head_unit"
+PROFILE2="a2dp_sink_aptx_hd"
+INDICATOR1="headset"
+INDICATOR2="a2dp"
+if [[ $(pacmd list-cards | grep $DEVICE | grep $INDICATOR1) ]]; then
+    pacmd set-card-profile $CARD $PROFILE2
+elif [[ $(pacmd list-cards | grep $DEVICE | grep $INDICATOR2) ]]; then
+    pacmd set-card-profile $CARD $PROFILE1
+fi

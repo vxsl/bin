@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Convenience script to summarize changes on a feature branch
+# ex.
+# > gds
+# HEAD...master:  2 files changed, 4 insertions(+), 1 deletion(-)
+
+PARENT_BRANCH=$(git show-branch | grep "*" | grep -v "$(git rev-parse --abbrev-ref HEAD)" | head -n1 | sed "s/.*\[\(.*\)\].*/\1/" | sed "s/[\^~].*//");
+if [ -z "$PARENT_BRANCH" ]; then
+    echo "Cannot determine the base branch.";
+else
+    # Get the number of files changed, insertions, and deletions for unstaged changes
+    unstaged=$(git diff --shortstat --color=always | sed 's/.* \([0-9]*\) files changed, \([0-9]*\) insertions(+), \([0-9]*\) deletions(-).*/\1 \x1b[32m+\2\x1b[0m \x1b[31m-\3\x1b[0m/');
+    
+    # Get the number of files changed, insertions, and deletions for staged changes
+    staged=$(git diff --shortstat --color=always --cached | sed 's/.* \([0-9]*\) files changed, \([0-9]*\) insertions(+), \([0-9]*\) deletions(-).*/\1 \x1b[32m+\2\x1b[0m \x1b[31m-\3\x1b[0m/');
+    
+    # Get the number of files changed, insertions, and deletions between HEAD and the parent branch
+    diff=$(git diff --shortstat --color=always $(git merge-base HEAD $PARENT_BRANCH)..HEAD | sed 's/.* \([0-9]*\) files changed, \([0-9]*\) insertions(+), \([0-9]*\) deletions(-).*/\1 \x1b[32m+\2\x1b[0m \x1b[31m-\3\x1b[0m/');
+    
+    if [ -n "$diff" ]; then
+        echo "HEAD...$PARENT_BRANCH: $diff";
+    fi
+    if [ -n "$unstaged" ]; then
+        echo "Unstaged: $unstaged";
+    fi
+    if [ -n "$staged" ]; then
+        echo "Staged: $staged";
+    fi
+fi
