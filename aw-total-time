@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Convenience script for getting the total time spent on the computer today.
+
+cd $HOME/dev/activitywatch && \
+source venv/bin/activate && \
+aw-client report "$HOSTNAME" 2>/dev/null \
+| grep 'Total duration:' | awk '{print $3}'
