@@ -1,0 +1,16 @@
+#!/bin/bash
+
+client="/tmp/tmux-pane-view-client"
+sess=$(
+    tmux list-clients -F '#{client_name} #{client_session}' \
+    | grep -w $(cat $client) \
+    | awk '{print $2}'
+)
+
+
+tmux send-keys -t "$sess:" C-c
+tmux send-keys -t "$sess:" C-l
+
+sleep 0.3
+
+tmux send-keys -t "$sess:" "$1" Enter
