@@ -1,0 +1,6 @@
+#!/bin/bash
+
+for proc in $(pgrep $1); do
+    name=$(procname $proc)
+    echo "$proc $name"
+done

@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Check if an input folder is provided
+if [ -z "$1" ]; then
+    echo "Please provide the input folder as an argument."
+    exit
+fi
+
+# Define system fonts directory
+system_fonts_dir="/usr/local/share/fonts"
+
+# Create a new directory in the system fonts directory
+font_family_dir="$system_fonts_dir/$(basename $1)"
+sudo mkdir -p "$font_family_dir"
+
+# Find all font files in the input folder and its subdirectories
+font_files=$(find "$1" -type f \( -name "*.ttf" -o -name "*.otf" \))
+
+# Copy font files to the new directory
+sudo cp -t "$font_family_dir" $font_files
+
+# Set permissions and update SELinux labels
+sudo chown -R root: "$font_family_dir"
+sudo chmod 644 "$font_family_dir"/*
+sudo restorecon -vFr "$font_family_dir"
+
+# Update the font cache
+fc-cache
+if [ $? -eq 0 ]; then
+    echo "Fonts installed successfully."
+else
+    echo "Failed to install fonts."
+fi
