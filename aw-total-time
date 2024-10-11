@@ -2,7 +2,16 @@
 
 # Convenience script for getting the total time spent on the computer today.
 
-cd $HOME/dev/activitywatch && \
-source venv/bin/activate && \
-aw-client report "$HOSTNAME" 2>/dev/null \
-| grep 'Total duration:' | awk '{print $3}'
+val=$(cd $HOME/dev/activitywatch && \
+    source venv/bin/activate && \
+    aw-client report "$HOSTNAME" 2>/dev/null \
+| grep 'Total duration:' | awk '{print $3}')
+
+# truncate the decimal part
+val=$(echo $val | cut -d'.' -f1)
+
+# remove 0:0 or 0: from the beginning:
+val=$(echo $val | sed 's/^0:\?//')
+
+# print
+echo $val
