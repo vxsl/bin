@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Start the Python script in the background
+python3 $HOME/dev/keep-presence/src/keep-presence.py -s 3 -c -p 200 "$@" &
+
+# Capture the Python process ID
+child_pid=$!
+
+# Define a function to clean up and kill the Python process
+cleanup() {
+    kill $child_pid 2>/dev/null
+    wait $child_pid 2>/dev/null
+}
+
+# Trap multiple signals and call cleanup
+trap cleanup SIGINT SIGTERM SIGHUP SIGQUIT
+
+# Wait for the Python process to finish
+wait $child_pid
