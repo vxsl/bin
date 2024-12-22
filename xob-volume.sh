@@ -1,41 +1,25 @@
-#!/usr/bin/env python3
-# taken from https://github.com/florentc/xob?tab=readme-ov-file#ready-to-use-volume-bar
+#!/bin/sh
+# taken from https://github.com/florentc/xob/issues/44#issue-1392379467
 
-from pulsectl import Pulse, PulseLoopStop
-import sys
+# Wait for amixer to become available
+until [ "$(amixer)" ]; do sleep 0.1; done
 
-with Pulse() as pulse:
-  def callback(ev):
-    if ev.index == sink_index: raise PulseLoopStop
-  def current_status(sink):
-    return round(sink.volume.value_flat * 100), sink.mute == 1
-  try:
-    sinks = {s.index:s for s in pulse.sink_list()}
-    if len(sys.argv) > 1:
-      # Sink index from command line argument if provided
-      sink_index = int(sys.argv[1])
-      if not sink_index in sinks:
-        raise KeyError(f"Sink index {sink_index} not found in list of sinks.")
-    else:
-      # Automatic determination of default sink otherwise
-      default_sink_name = pulse.server_info().default_sink_name
-      try:
-        sink_index = next(index for index, sink in sinks.items()
-                          if sink.name == default_sink_name)
-      except StopIteration: raise StopIteration("No default sink was found.")
-
-    pulse.event_mask_set('sink')
-    pulse.event_callback_set(callback)
-    last_value, last_mute = current_status(sinks[sink_index])
-
-    while True:
-      pulse.event_listen()
-      sinks = {s.index:s for s in pulse.sink_list()}
-      value, mute = current_status(sinks[sink_index])
-      if value != last_value or mute != last_mute:
-        print(str(value) + ('!' if mute else ''))
-        last_value, last_mute = value, mute
-      sys.stdout.flush()
-
-  except Exception as e:
-    print(f"ERROR: {e}", file=sys.stderr)
+# `amixer events` always emits 1 event from the start, so we must skip it
+skip=1
+stdbuf -oL amixer events |
+while IFS= read -r line; do
+    case ${line%%,*} in
+        ('event value: numid='[34])
+        if [ "$skip" -eq 0 ]; then
+            # The `0+$2` below is to remove the '%' sign
+            amixer sget Master |
+            awk -F'[][]' '/Left:/ {print 0+$2 ($4 == "off" ? "!" : "")}'
+            
+            # Using Pipewire/Wireplumber:
+            #wpctl get-volume @DEFAULT_AUDIO_SINK@ |
+            #  awk '{ gsub(/\./, "", $2); print $2 ($3 == "[MUTED]" ? "!" : "")}'
+        else
+            skip=$(( skip - 1 ))
+        fi
+    esac
+done | xob
