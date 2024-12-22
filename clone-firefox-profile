@@ -1,4 +1,5 @@
 #!/bin/bash
+
 if pgrep -x "firefox" >/dev/null; then
     echo "Error: End Firefox processes before proceeding."
     exit 1
@@ -46,8 +47,31 @@ fi
 ff_dir="$HOME/.mozilla/firefox"
 
 
+# Find profiles matching the pattern {id}.{something} containing prefs.js
+profiles=()
+while IFS= read -r -d $'\0' dir; do
+    profile_name=$(basename "$dir")
+    if [[ "$profile_name" =~ ^[^.]+\.[^.]+$ ]]; then  # Matches {id}.{something}
+        profile_title="${profile_name#*.}"  # Extract {something}
+        profiles+=("$profile_title")
+    fi
+done < <(find "$ff_dir" -maxdepth 1 -type d -exec test -f "{}/prefs.js" \; -print0)
+
+if [ ${#profiles[@]} -eq 0 ]; then
+    echo "Error: No valid Firefox profiles found."
+    exit 1
+fi
+
+echo "Available Profiles:"
+select profile_title in "${profiles[@]}"; do
+    if [[ -n "$profile_title" ]]; then
+        break
+    else
+        echo "Invalid selection. Please choose a profile."
+    fi
+done
+
 desired_num_clones="$1"
-profile_title="default-release"
 existing_profile_pattern="*.$profile_title"
 
 # Check if the base profile exists
