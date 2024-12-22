@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [[ "$1" = "host" ]]; then
-    neofetch --off --stdout | head -n 1
+    fastfetch --logo none | head -n 1
     exit
 fi
-neofetch --off --stdout | grep "$1:" | awk -F: '{ print $2 }' | xargs
+fastfetch --logo none | grep "$1:" | awk -F: '{ print $2 }' | xargs
