@@ -5,3 +5,5 @@
 **/cur_brightness
 **/cur_temp
 **/100]
+**/kp-status
+**/nohup.out
