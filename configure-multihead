@@ -1,6 +1,8 @@
 #!/bin/bash
 
+prompt="Adjust your display configuration, then:\\nLayout > Save As > ~/.screenlayout/multihead.sh"
 mkdir -p $HOME/.screenlayout
-zenity --question --text="Adjust your display configuration, then:\\nLayout > Save As > ~/.screenlayout/multihead.sh" --title="Important" --ok-label="Next" --cancel-label="Cancel" && \
+zenity --question --text="$prompt" --title="Important" --ok-label="Next" --cancel-label="Cancel" && \
+echo "$prompt" && \
 arandr && \
 bash $HOME/.screenlayout/multihead.sh
