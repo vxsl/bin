@@ -1,0 +1,28 @@
+#!/bin/bash
+
+#======================================================
+print_usage() {
+    echo "Usage: $0 <WM_CLASS> <device> <device> ..."
+}
+if [ "$#" -lt 2 ]; then
+    print_usage
+    exit 1
+fi
+#------------------------------------------------------
+
+WINDOW=$(xdotool search --onlyvisible --class "$1" | head -n 1)
+
+if [ -z "$WINDOW" ]; then
+    echo "window not found!"
+    exit 1
+fi
+
+GEOMETRY=$(xwininfo -id "$WINDOW" | grep -E 'Absolute.*|Width|Height')
+X=$(echo "$GEOMETRY" | grep 'Absolute upper-left X' | awk '{print $4}')
+Y=$(echo "$GEOMETRY" | grep 'Absolute upper-left Y' | awk '{print $4}')
+WIDTH=$(echo "$GEOMETRY" | grep 'Width' | awk '{print $2}')
+HEIGHT=$(echo "$GEOMETRY" | grep 'Height' | awk '{print $2}')
+
+for arg in "${@:2}"; do
+    xsetwacom set "$arg" MapToOutput "$WIDTH"x"$HEIGHT"+"$X"+"$Y"
+done
