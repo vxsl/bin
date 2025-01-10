@@ -4,26 +4,36 @@
 
 if [ $# -ge 3 ]; then
     existing_wins=$(xdotool search $2 | sort)
+
     eval $3 &
     if [[ $# -eq 4 ]]; then
         sleep $4
     fi
     for run in {1..100}; do
-        WIN=$(comm -23 \
+        WINS=$(comm -23 \
             <(xdotool search $2 | sort) \
         <(echo "$existing_wins"))
-        if [ -z "$WIN" ]; then
+        if [ -z "$WINS" ]; then
             sleep 0.1
         else
             break
         fi
     done
     sleep 0.1
-    xdotool set_window --classname $1 --class $1 $WIN
-    WIN=$(comm -23 \
+
+    while read -r w; do 
+        echo "$w";
+        xdotool set_window --classname $1 --class $1 $w
+    done < <(echo -e "$WINS")
+
+    WINS=$(comm -23 \
         <(xdotool search $2 | sort) \
     <(echo "$existing_wins"))
-    xdotool set_window --classname $1 --class $1 $WIN
+
+    while read -r w; do 
+        echo "$w";
+        xdotool set_window --classname $1 --class $1 $w
+    done < <(echo -e "$WINS")
 else
     echo "usage: spawn-with-name <name> <query> <cmd> <init-wait>"
 fi
