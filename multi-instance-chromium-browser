@@ -1,0 +1,6 @@
+#!/bin/bash
+
+sudo rm -f $HOME/.config/chromium/SingletonLock
+sudo rm -f $HOME/.config/chromium/SingletonSocket
+
+chromium-browser "$@"
