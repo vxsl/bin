@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+path="$HOME/.config/alacritty/transparent.toml"
+[[ ! -f "$path" ]] && \
+notify-send "transparent.toml does not exist" && exit 0
+
+opacity=$(awk -F '=' '/^opacity/ {gsub(/[[:space:]]/, "", $2); print $2; exit}' $path)
+case $opacity in
+    1)
+        toggle_opacity=0
+    ;;
+    *)
+        toggle_opacity=1
+    ;;
+esac
+
+target=$(readlink -f $path)
+if [[ -z "$target" ]]; then
+    echo "Error: Symlink target does not exist or is invalid."
+    exit 1
+fi
+
+sed -i -- "s/opacity = $opacity/opacity = $toggle_opacity/" "$target"
