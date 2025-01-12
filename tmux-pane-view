@@ -11,8 +11,12 @@ for arg in "$@"; do
         --alacritty_theme=*)
             alacritty_theme="${arg#--alacritty_theme=}"
             ;;
+        --cmd=*)
+            cmd="${arg#--cmd=}"
+            ;;
     esac
 done
+
 
 if [ -z "$1" ] || [ -n "$alacritty_theme" ] || [ -n "$class" ]; then
 
@@ -46,12 +50,12 @@ if [ -z "$1" ] || [ -n "$alacritty_theme" ] || [ -n "$class" ]; then
     "
     trap '
     target=\$(cat \"$cached_target_path\");
+    rm -f $cached_client_path $cached_target_path;
     if [ -n \"\$target\" ]; then
         tmux set -u -pt \$target status;
         tmux set -u -pt \$target status-left;
         tmux set -u -pt \$target status-position;
     fi
-    rm -f $cached_client_path $cached_target_path;
     ' EXIT;
     tmux-pane-view --record-client-id && tmux attach-session -t \"$widest:\"
     "
@@ -69,6 +73,7 @@ if [ "$1" == "--target-current-pane" ]; then
         if [ -n "$target" ]; then
             tmux set -upt $target status
             tmux set -upt $target status-left
+            tmux set -upt $target status-left-length
             tmux set -upt $target status-position
         fi
 
@@ -76,8 +81,11 @@ if [ "$1" == "--target-current-pane" ]; then
         
         echo $child_session>$cached_target_path
         $tSet status on
-        $tSet status-left "PANE-VIEW "
+        left="[ PANE-VIEW $child_session -> $view_client ]  "
+        left_length=$((${#left} + 1))
+        $tSet status-left-length $left_length
         $tSet status-position top
+        $tSet status-left "$left"
 
         tmux switch-client -c "$view_client" -t "$child_session" 
     fi
@@ -90,9 +98,11 @@ if [ "$1" == "--pane-to-session" ]; then
     child_session=\"$parent_pane\"_child
 
     TMUX= tmux new-session \; \
-    send-keys "tmux rename-session $child_session" Enter \; \
+    send-keys " tmux rename-session $child_session" Enter \; \
+    send-keys " " Enter \; \
     bind-key -n M-Space run-shell 'p=#{pane_id}; tmux copy-mode -t "${p}_child:"' \; \
-    send-keys C-l
+    send-keys "$cmd" Enter \; \
+    send-keys C-l 
 
     exit 0
 fi

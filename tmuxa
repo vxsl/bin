@@ -37,7 +37,7 @@ cd $dir
 
 p2s="tmux-pane-view --pane-to-session"
 if [ -n "$cmd" ]; then
-    p2s="$p2s \"$cmd\""
+    p2s="$p2s --cmd=\"$cmd\""
 fi
 
 # If the session doesn't exist, create it and set up the layout
@@ -51,7 +51,7 @@ if ! tmux has-session -t "$1" 2>/dev/null; then
         select-pane -t 3 \; \
         setw window-active-style bg=black 
     else
-        tmux new-session -s "$1" $p2s
+        tmux new-session -s "$1" "$p2s"
     fi
 fi
 
