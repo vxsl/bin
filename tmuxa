@@ -5,31 +5,54 @@
 # be applied. An initial working directory can be specified as the second argument.
 #
 # ex.
-#  tmuxa mysession ~/projects/myproject
+#  tmuxa mysession --dir=~/projects/myproject
 
-if [ $# -eq 1 ] || [ $# -eq 2 ]; then
-    session_name="$1"
-else
-    echo "usage: tmuxa <session-name> [<dir>]"
+if [ $# -lt 1 ] || [ $# -gt 4 ]; then
+    echo "usage: tmuxa <session-name> [--dir=<dir>] [--no-layout] [--cmd=<cmd>]"
     exit 1
 fi
 
-if [ -z "$2" ]; then
-    cd $HOME
-else
-    cd $2
-fi
+# Default values
+session_name="$1"
+no_layout=false
+dir="$HOME"
+cmd=""
+
+# Loop through the arguments to automatically assign variables
+for arg in "$@"; do
+    case "$arg" in
+        --dir=*)
+            dir="${arg#--dir=}"
+            ;;
+        --no-layout)
+            no_layout=true
+            ;;
+        --cmd=*)
+            cmd="${arg#--cmd=}"
+            ;;
+    esac
+done
+
+cd $dir
 
 p2s="tmux-pane-view --pane-to-session"
+if [ -n "$cmd" ]; then
+    p2s="$p2s \"$cmd\""
+fi
 
 # If the session doesn't exist, create it and set up the layout
 if ! tmux has-session -t "$1" 2>/dev/null; then
-    tmux new-session -s "$1" $p2s \; \
-    split-window -v -l "90%" $p2s \; \
-    select-pane -t 0 \; \
-    split-window -h $p2s \; \
-    split-window -h $p2s \; \
-    select-pane -t 3
+    if [ "$no_layout" = false ]; then
+        tmux new-session -s "$1" $p2s \; \
+        split-window -v -l "90%" $p2s \; \
+        select-pane -t 0 \; \
+        split-window -h $p2s \; \
+        split-window -h $p2s \; \
+        select-pane -t 3 \; \
+        setw window-active-style bg=black 
+    else
+        tmux new-session -s "$1" $p2s
+    fi
 fi
 
 # Otherwise, attach to the session

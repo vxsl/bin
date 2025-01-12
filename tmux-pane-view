@@ -1,8 +1,33 @@
 #!/bin/bash
 
-cached_client="/tmp/tmux-pane-view-client"
+cached_client_path="/tmp/tmux-pane-view-client"
+cached_target_path="/tmp/tmux-pane-target"
 
-if [ -z "$1" ]; then
+for arg in "$@"; do
+    case "$arg" in
+        --class=*)
+            class="${arg#--class=}"
+            ;;
+        --alacritty_theme=*)
+            alacritty_theme="${arg#--alacritty_theme=}"
+            ;;
+    esac
+done
+
+if [ -z "$1" ] || [ -n "$alacritty_theme" ] || [ -n "$class" ]; then
+
+    class_arg="--class "
+    if [ -n "$class" ]; then
+        class_arg+="$class"
+    else
+        class_arg+="tmux-pane-view"
+    fi
+
+    theme_arg=""
+    if [ -n "$alacritty_theme" ]; then
+        theme_arg="--config-file $alacritty_theme"
+    fi
+
     sessions=$(tmux list-sessions -F "#{session_name} #{pane_height} #{pane_width}")
     
     # initially attach the view to the widest pane:
@@ -16,35 +41,59 @@ if [ -z "$1" ]; then
             fi
         fi
     done <<< "$sessions"
-    
-    alacritty -o font.size=14 --class tmux-pane-view -e sh -c \
-    "tmux-pane-view --record-client-id && tmux attach-session -t \"$widest:\"" \
-    ; sudo rm -f $cached_client
+
+    alacritty -o font.size=14 $class_arg $theme_arg -e sh -c \
+    "
+    trap '
+    target=\$(cat \"$cached_target_path\");
+    if [ -n \"\$target\" ]; then
+        tmux set -u -pt \$target status;
+        tmux set -u -pt \$target status-left;
+        tmux set -u -pt \$target status-position;
+    fi
+    rm -f $cached_client_path $cached_target_path;
+    ' EXIT;
+    tmux-pane-view --record-client-id && tmux attach-session -t \"$widest:\"
+    "
+
     exit 0
 fi
 
 if [ "$1" == "--target-current-pane" ]; then
-    view_client=$(cat $cached_client)
+    view_client=$(cat $cached_client_path)
     parent_pane=$(tmux display -p "#{pane_id}")
     child_session=""$parent_pane"_child:"
-    if [ -n "$view_client" ]; then
-        tmux switch-client -c "$view_client" -t "$child_session"
+
+    if [ -n "$view_client" ] && [ -n "$(tmux list-clients | grep -w $view_client)" ]; then
+        target=$(cat $cached_target_path)
+        if [ -n "$target" ]; then
+            tmux set -upt $target status
+            tmux set -upt $target status-left
+            tmux set -upt $target status-position
+        fi
+
+        tSet="tmux set -p -t $child_session"
+        
+        echo $child_session>$cached_target_path
+        $tSet status on
+        $tSet status-left "PANE-VIEW "
+        $tSet status-position top
+
+        tmux switch-client -c "$view_client" -t "$child_session" 
     fi
+    
     exit 0
 fi
 
 if [ "$1" == "--pane-to-session" ]; then
     parent_pane="$TMUX_PANE"
     child_session=\"$parent_pane\"_child
-    
+
     TMUX= tmux new-session \; \
-    setw focus-events on \; \
-    setw pane-focus-out 'set -p window-active-style bg=#101010' \; \
-    setw pane-focus-in 'set -p window-active-style bg=black' \; \
     send-keys "tmux rename-session $child_session" Enter \; \
     bind-key -n M-Space run-shell 'p=#{pane_id}; tmux copy-mode -t "${p}_child:"' \; \
     send-keys C-l
-    
+
     exit 0
 fi
 
@@ -54,7 +103,7 @@ if [ "$1" == "--record-client-id" ]; then
     "tmux list-clients -F '#{client_name} #{client_session}' \
     | grep -w $tmp_sess \
     | awk '{print \$1}' \
-    >$cached_client \
+    >$cached_client_path \
     && sleep 0.1 && tmux detach"
     exit 0
 fi
