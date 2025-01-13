@@ -2,6 +2,9 @@
 
 cached_client_path="/tmp/tmux-pane-view-client"
 cached_target_path="/tmp/tmux-pane-target"
+cached_client_path_alt="/tmp/tmux-pane-view-client-alt"
+cached_target_path_alt="/tmp/tmux-pane-target-alt"
+alt_client_arg=""
 
 for arg in "$@"; do
     case "$arg" in
@@ -14,45 +17,87 @@ for arg in "$@"; do
         --cmd=*)
             cmd="${arg#--cmd=}"
             ;;
-        --set-target)
-            set_target=true
+        --alt-client)
+            alt_client=true
+            alt_client_arg=" --alt-client"
             ;;
     esac
 done
 
+get_view_client_path () {
+    if [ "$alt_client" == "true" ]; then
+        echo $cached_client_path_alt
+    else
+        echo $cached_client_path
+    fi
+}
+
+get_view_client () {
+    if [ -f $(get_view_client_path) ]; then
+        cat $(get_view_client_path)
+    fi
+}
+
+get_target_path () {
+    if [ "$alt_client" == "true" ]; then
+        echo $cached_target_path_alt
+    else
+        echo $cached_target_path
+    fi
+}
+
+get_target () {
+    if [ -f $(get_target_path) ]; then
+        cat $(get_target_path)
+    fi
+}
+
 set_new_target () {
-    view_client=$(cat $cached_client_path)
+    view_client=$(get_view_client)
     target="$1"
 
     if [ -z "$target" ] || [ -z "$view_client" ] || [ -z "$(tmux list-clients | grep -w $view_client)" ]; then
         exit 1
     fi
 
-    old_target=$(cat $cached_target_path)
+    old_target=$(get_target)
+
     if [ -n "$old_target" ]; then
         tmux set -upt $old_target status
         tmux set -upt $old_target status-left
         tmux set -upt $old_target status-left-length
         tmux set -upt $old_target status-position
+        tmux set -upt $old_target status-bg
     fi
 
     tSet="tmux set -p -t $target"
     
-    echo $target>$cached_target_path
+    target_path=$(get_target_path)
+    echo $target>$target_path
     $tSet status on
 
     escaped_target=$(echo "$target" | sed 's/%/%%/g') 
-    left="[ PANE-VIEW $escaped_target -> $view_client ]  "
+    left="[ PANE-VIEW "
+    if [ $alt_client == "true" ]; then
+        left+="(ALT) "
+    fi
+    left+="$escaped_target -> $view_client ]  "
 
     left_length=$((${#left} + 1))
     $tSet status-left-length $left_length
     $tSet status-position top
     $tSet status-left "$left"
+    if [ $alt_client == "true" ]; then
+        $tSet status-bg "#797979"
+    fi
 
     tmux switch-client -c "$view_client" -t "$target" 
 }
 
 if [ -z "$1" ] || [ -n "$alacritty_theme" ] || [ -n "$class" ]; then
+
+    target_path=$(get_target_path)
+    client_path=$(get_view_client_path)
 
     class_arg="--class "
     if [ -n "$class" ]; then
@@ -80,20 +125,18 @@ if [ -z "$1" ] || [ -n "$alacritty_theme" ] || [ -n "$class" ]; then
         fi
     done <<< "$sessions"
 
-
-
     alacritty -o font.size=14 $class_arg $theme_arg -e sh -c \
     "
     trap '
-    target=\$(cat \"$cached_target_path\");
-    rm -f $cached_client_path $cached_target_path;
+    target=\$(cat \"$target_path\");
+    rm -f $client_path $target_path;
     if [ -n \"\$target\" ]; then
         tmux set -u -pt \$target status;
         tmux set -u -pt \$target status-left;
         tmux set -u -pt \$target status-position;
     fi
     ' EXIT;
-    tmux-pane-view --record-client-id && tmux attach-session -t \"$widest:\"
+    tmux-pane-view --record-client-id$alt_client_arg && tmux attach-session -t \"$widest:\"
     " &
 
     sleep 1
@@ -104,7 +147,6 @@ if [ -z "$1" ] || [ -n "$alacritty_theme" ] || [ -n "$class" ]; then
 fi
 
 if [ "$1" == "--target-current-pane" ]; then
-    view_client=$(cat $cached_client_path)
     parent_pane=$(tmux display -p "#{pane_id}")
     child_session=""$parent_pane"_child:"
 
@@ -127,12 +169,13 @@ if [ "$1" == "--pane-to-session" ]; then
 fi
 
 if [ "$1" == "--record-client-id" ]; then
+    client_path=$(get_view_client_path)
     tmp_sess="tmux-pane-view-tmp-session"
     tmux new-session -s $tmp_sess \
     "tmux list-clients -F '#{client_name} #{client_session}' \
     | grep -w $tmp_sess \
     | awk '{print \$1}' \
-    >$cached_client_path \
+    >$client_path \
     && sleep 0.1 && tmux detach"
     exit 0
 fi
