@@ -14,9 +14,43 @@ for arg in "$@"; do
         --cmd=*)
             cmd="${arg#--cmd=}"
             ;;
+        --set-target)
+            set_target=true
+            ;;
     esac
 done
 
+set_new_target () {
+    view_client=$(cat $cached_client_path)
+    target="$1"
+
+    if [ -z "$target" ] || [ -z "$view_client" ] || [ -z "$(tmux list-clients | grep -w $view_client)" ]; then
+        exit 1
+    fi
+
+    old_target=$(cat $cached_target_path)
+    if [ -n "$old_target" ]; then
+        tmux set -upt $old_target status
+        tmux set -upt $old_target status-left
+        tmux set -upt $old_target status-left-length
+        tmux set -upt $old_target status-position
+    fi
+
+    tSet="tmux set -p -t $target"
+    
+    echo $target>$cached_target_path
+    $tSet status on
+
+    escaped_target=$(echo "$target" | sed 's/%/%%/g') 
+    left="[ PANE-VIEW $escaped_target -> $view_client ]  "
+
+    left_length=$((${#left} + 1))
+    $tSet status-left-length $left_length
+    $tSet status-position top
+    $tSet status-left "$left"
+
+    tmux switch-client -c "$view_client" -t "$target" 
+}
 
 if [ -z "$1" ] || [ -n "$alacritty_theme" ] || [ -n "$class" ]; then
 
@@ -32,7 +66,7 @@ if [ -z "$1" ] || [ -n "$alacritty_theme" ] || [ -n "$class" ]; then
         theme_arg="--config-file $alacritty_theme"
     fi
 
-    sessions=$(tmux list-sessions -F "#{session_name} #{pane_height} #{pane_width}")
+    sessions=$(tmux list-sessions -F "#{session_name} #{pane_height} #{pane_width}" -f '#{m:1,#{session_attached}}')
     
     # initially attach the view to the widest pane:
     max_width=0
@@ -46,6 +80,8 @@ if [ -z "$1" ] || [ -n "$alacritty_theme" ] || [ -n "$class" ]; then
         fi
     done <<< "$sessions"
 
+
+
     alacritty -o font.size=14 $class_arg $theme_arg -e sh -c \
     "
     trap '
@@ -58,7 +94,11 @@ if [ -z "$1" ] || [ -n "$alacritty_theme" ] || [ -n "$class" ]; then
     fi
     ' EXIT;
     tmux-pane-view --record-client-id && tmux attach-session -t \"$widest:\"
-    "
+    " &
+
+    sleep 1
+    set_new_target "$widest:"
+
 
     exit 0
 fi
@@ -68,41 +108,20 @@ if [ "$1" == "--target-current-pane" ]; then
     parent_pane=$(tmux display -p "#{pane_id}")
     child_session=""$parent_pane"_child:"
 
-    if [ -n "$view_client" ] && [ -n "$(tmux list-clients | grep -w $view_client)" ]; then
-        target=$(cat $cached_target_path)
-        if [ -n "$target" ]; then
-            tmux set -upt $target status
-            tmux set -upt $target status-left
-            tmux set -upt $target status-left-length
-            tmux set -upt $target status-position
-        fi
+    set_new_target $child_session
 
-        tSet="tmux set -p -t $child_session"
-        
-        echo $child_session>$cached_target_path
-        $tSet status on
-        left="[ PANE-VIEW $child_session -> $view_client ]  "
-        left_length=$((${#left} + 1))
-        $tSet status-left-length $left_length
-        $tSet status-position top
-        $tSet status-left "$left"
-
-        tmux switch-client -c "$view_client" -t "$child_session" 
-    fi
-    
     exit 0
 fi
 
 if [ "$1" == "--pane-to-session" ]; then
     parent_pane="$TMUX_PANE"
-    child_session=\"$parent_pane\"_child
+    child_session="$parent_pane"_child
 
-    TMUX= tmux new-session \; \
-    send-keys " tmux rename-session $child_session" Enter \; \
-    send-keys " " Enter \; \
-    bind-key -n M-Space run-shell 'p=#{pane_id}; tmux copy-mode -t "${p}_child:"' \; \
-    send-keys "$cmd" Enter \; \
-    send-keys C-l 
+    if [ -n "$cmd" ]; then
+        TMUX= tmux new -s $child_session "$cmd"
+    else
+        TMUX= tmux new -s $child_session
+    fi
 
     exit 0
 fi
