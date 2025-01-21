@@ -259,10 +259,14 @@ if [ "$1" == "--pane-to-session" ]; then
     child_session="$parent_pane"_child
 
     if [ -n "$cmd" ]; then
-        TMUX= tmux new -s $child_session "$cmd"
+        tmux new -d -s $child_session "$cmd"
     else
-        TMUX= tmux new -s $child_session
+        tmux new -d -s $child_session
     fi
+
+    tmux-pane-reflect-ssh $child_session
+
+    TMUX= tmux attach -t $child_session:
 
     exit 0
 fi

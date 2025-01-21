@@ -1,0 +1,18 @@
+#!/bin/bash
+
+session="$1"
+if [ -z "$session" ]; then
+    echo tmux-pane-reflect-ssh: no session provided
+    exit 1
+fi
+pane="$session":0.0
+            
+tmux set -p -t $pane monitor-activity on
+tmux set -p -t $pane activity-action current
+tmux set-hook -p -t $pane alert-activity \
+    "run-shell '\
+    if tmux display -p -t $pane #{pane_current_command} | grep "^ssh" >/dev/null; then \
+        tmux-pane-view --set-status $session: ssh
+    else
+        tmux-pane-view --set-status $session: exit-ssh
+    fi'"
