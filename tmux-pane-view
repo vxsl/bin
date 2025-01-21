@@ -96,14 +96,14 @@ set_status_inner () {
                 $tSet status-fg white
                 ;;
             "ssh+pane-view")
-                set_left "$ssh_label $pv_label"
+                set_left "$ssh_label ███████ $pv_label ███████"
                 $tSet status on
                 $tSet status-position top
-                $tSet status-fg blue
+                $tSet status-fg white
                 if [ $alt_client == "true" ]; then
-                    $tSet status-bg "#797979"
+                    $tSet status-bg "#5353c6"
                 else
-                    $tSet status-bg "white"
+                    $tSet status-bg "blue"
                 fi
                 ;;
             "pane-view")
