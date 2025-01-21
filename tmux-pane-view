@@ -4,6 +4,7 @@ cached_client_path="/tmp/tmux-pane-view-client"
 cached_target_path="/tmp/tmux-pane-target"
 cached_client_path_alt="/tmp/tmux-pane-view-client-alt"
 cached_target_path_alt="/tmp/tmux-pane-target-alt"
+alt_client="false"
 alt_client_arg=""
 
 for arg in "$@"; do
@@ -18,14 +19,14 @@ for arg in "$@"; do
             cmd="${arg#--cmd=}"
             ;;
         --alt-client)
-            alt_client=true
+            alt_client="true"
             alt_client_arg=" --alt-client"
             ;;
     esac
 done
 
 get_view_client_path () {
-    if [ "$alt_client" == "true" ]; then
+    if [ $alt_client == "true" ] || [ "$1" == "--alt" ]; then
         echo $cached_client_path_alt
     else
         echo $cached_client_path
@@ -33,63 +34,161 @@ get_view_client_path () {
 }
 
 get_view_client () {
-    if [ -f $(get_view_client_path) ]; then
-        cat $(get_view_client_path)
+    if [ -f $(get_view_client_path $@) ]; then
+        cat $(get_view_client_path $@)
     fi
 }
 
 get_target_path () {
-    if [ "$alt_client" == "true" ]; then
-        echo $cached_target_path_alt
+    if { [ "$1" == "--alt" ]; } \
+    || { [ "$1" != "--invert" ] && [ "$alt_client" == "true" ]; } \
+    || { [ "$1" == "--invert" ] && [ "$alt_client" == "false" ]; }; then
+        echo "$cached_target_path_alt"
     else
-        echo $cached_target_path
+        echo "$cached_target_path"
     fi
 }
 
 get_target () {
-    if [ -f $(get_target_path) ]; then
-        cat $(get_target_path)
+    local path=$(get_target_path $@)
+    if [ -f $path ]; then
+        cat $path
     fi
 }
 
-set_new_target () {
-    view_client=$(get_view_client)
-    target="$1"
 
-    if [ -z "$target" ] || [ -z "$view_client" ] || [ -z "$(tmux list-clients | grep -w $view_client)" ]; then
+set_status_inner () {
+    local target="$1"
+    local mode="$2"
+    local tSet="tmux set -p -t $target"
+    if [ $mode = "none" ]; then
+        $tSet -u status
+        $tSet -u status-left
+        $tSet -u status-left-length
+        $tSet -u status-position
+        $tSet -u status-bg
+        $tSet -u status-fg
+
+    else
+        local view_client=$(get_view_client)
+        local escaped_target=$(echo "$target" | sed 's/%/%%/g') 
+        local pv_label="[PANE-VIEW "
+        if [ $alt_client = 'true' ]; then
+            pv_label+="(ALT) "
+        fi
+        pv_label+="$escaped_target -> $view_client]"
+
+        local ssh_label="[ssh]"
+
+        set_left () {
+            local left+="$1  "
+            local left_length=$((${#left} + 1))
+            $tSet status-left "$left" 
+            $tSet status-left-length $left_length
+        }
+
+        case "$mode" in
+            "ssh")
+                set_left "$ssh_label"
+                $tSet status on
+                $tSet status-position top
+                $tSet status-bg blue
+                $tSet status-fg white
+                ;;
+            "ssh+pane-view")
+                set_left "$ssh_label $pv_label"
+                $tSet status on
+                $tSet status-position top
+                $tSet status-fg blue
+                if [ $alt_client == "true" ]; then
+                    $tSet status-bg "#797979"
+                else
+                    $tSet status-bg "white"
+                fi
+                ;;
+            "pane-view")
+                set_left "$pv_label"
+                $tSet status on
+                $tSet status-position top
+                $tSet status-fg black
+                if [[ $alt_client = "true" ]]; then
+                    $tSet status-bg "#797979"
+                else
+                    $tSet status-bg "white"
+                fi
+                ;;
+        esac
+    fi
+}
+
+set_status () {
+    local target="$1"
+    if [ $target = $(get_target --alt) ]; then
+        alt_client="true"
+    fi
+    local p="$target"0.0
+    local mode="$2"
+
+    local status_on=$(tmux display -p -t $p "#{status}")
+    local old_left=$(tmux display -p -t $p "#{status-left}")
+
+    case "$mode" in
+        "no-status")
+            set_status_inner $p "none" 
+            ;;
+        "exit-ssh")
+            if [ $status_on = "on" ] && [[ $old_left == *"PANE-VIEW"* ]]; then
+                set_status_inner $p "pane-view"
+            else
+                set_status_inner $p "none"
+            fi
+            ;;
+        "ssh")
+            if [[ $old_left != *"ssh"* ]]; then
+                if [ $status_on = "on" ] && [[ $old_left == *"PANE-VIEW"* ]]; then
+                    set_status_inner $p "ssh+pane-view"
+                else
+                    set_status_inner $p "ssh"
+                fi
+            fi
+            ;;
+        "pane-view")
+            if [[ $old_left != *"PANE-VIEW"* ]]; then
+                if [ $status_on = "on" ] && [[ $old_left == *"ssh"* ]]; then
+                    set_status_inner $p "ssh+pane-view"
+                else
+                    set_status_inner $p "pane-view"
+                fi
+            fi
+            ;;
+    esac
+}
+
+set_new_target () {
+    local view_client=$(get_view_client)
+    local target="$1"
+
+    if [ $target = $(get_target --invert) ]; then
+        echo "$target" already in use.
+        exit 1
+    elif [ -z "$view_client" ] || [ -z "$(tmux list-clients | grep -w $view_client)" ]; then
+        echo "No pane-view client found."
+        exit 1
+    elif [ -z "$target" ]; then
+        echo "No pane-view target found."
         exit 1
     fi
 
-    old_target=$(get_target)
+    local old_target=$(get_target)
 
-    if [ -n "$old_target" ]; then
-        tmux set -upt $old_target status
-        tmux set -upt $old_target status-left
-        tmux set -upt $old_target status-left-length
-        tmux set -upt $old_target status-position
-        tmux set -upt $old_target status-bg
+    if [ -n "$old_target" ] && [ "$old_target" != "$target" ]; then
+        set_status $old_target "no-status"
     fi
 
-    tSet="tmux set -p -t $target"
-    
-    target_path=$(get_target_path)
+    local target_path=$(get_target_path)
     echo $target>$target_path
-    $tSet status on
 
-    escaped_target=$(echo "$target" | sed 's/%/%%/g') 
-    left="[ PANE-VIEW "
-    if [ $alt_client == "true" ]; then
-        left+="(ALT) "
-    fi
-    left+="$escaped_target -> $view_client ]  "
-
-    left_length=$((${#left} + 1))
-    $tSet status-left-length $left_length
-    $tSet status-position top
-    $tSet status-left "$left"
-    if [ $alt_client == "true" ]; then
-        $tSet status-bg "#797979"
-    fi
+    set_status $target "pane-view"
 
     tmux switch-client -c "$view_client" -t "$target" 
 }
@@ -170,12 +269,17 @@ fi
 
 if [ "$1" == "--record-client-id" ]; then
     client_path=$(get_view_client_path)
-    tmp_sess="tmux-pane-view-tmp-session"
+    tmp_sess="tmux-pane-view-tmp-session$alt_client"
     tmux new-session -s $tmp_sess \
     "tmux list-clients -F '#{client_name} #{client_session}' \
     | grep -w $tmp_sess \
     | awk '{print \$1}' \
     >$client_path \
     && sleep 0.1 && tmux detach"
+    exit 0
+fi
+
+if [ "$1" == "--set-status" ]; then
+    set_status $2 $3
     exit 0
 fi

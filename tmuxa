@@ -43,7 +43,7 @@ fi
 # If the session doesn't exist, create it and set up the layout
 if ! tmux has-session -t "$1" 2>/dev/null; then
     if [ "$no_layout" = false ]; then
-        tmux new-session -s "$1" $p2s \; \
+        tmux new-session -d -s "$1" $p2s \; \
         split-window -v -l "90%" $p2s \; \
         select-pane -t 0 \; \
         split-window -h $p2s \; \
@@ -51,9 +51,26 @@ if ! tmux has-session -t "$1" 2>/dev/null; then
         select-pane -t 3 \; \
         setw window-active-style bg=black 
     else
-        tmux new-session -s "$1" "$p2s"
+        tmux new-session -d -s "$1" "$p2s"
     fi
+    tmux list-panes -a -F '#{pane_id} #{session_name}' >>/home/kyle/test.log;
+
+    sessions=$(tmux list-panes -a -F '#{pane_id} #{session_name}' | grep _child | awk '{print $2}')
+
+    for session in $sessions; do
+        pane="$session":0.0
+        tmux set -p -t $pane monitor-activity on
+        tmux set -p -t $pane activity-action current
+        tmux set-hook -p -t $pane alert-activity \
+            "run-shell '\
+            if tmux display -p -t $pane #{pane_current_command} | grep "^ssh"; then \
+                tmux-pane-view --set-status $session: ssh
+            else
+                tmux-pane-view --set-status $session: exit-ssh
+            fi'"
+    done
 fi
+
 
 # Otherwise, attach to the session
 tmux attach -t "$session_name"
