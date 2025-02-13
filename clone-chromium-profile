@@ -1,0 +1,57 @@
+#!/bin/bash
+
+if pgrep -x "chromium" >/dev/null; then
+    echo "Error: End Chromium processes before proceeding."
+    exit 1
+fi
+
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+    echo "Usage: $0 <desired_num_clones> [--reset]"
+    exit 1
+fi
+
+chromium_dir="$HOME/.config/chromium"
+default_profile="$chromium_dir/Default"
+
+# Check if the Default profile exists
+if [ ! -d "$default_profile" ]; then
+    echo "Error: Default profile not found at '$default_profile'."
+    exit 1
+fi
+
+# Handle reset option
+if [ "$#" -eq 2 ] && [ "$2" == "--reset" ]; then
+    find "$chromium_dir" -maxdepth 1 -type d -name 'DefaultClone*' -exec rm -rf {} \;
+    echo "Reset completed: All existing clones removed."
+fi
+
+# Function to find the next available clone number
+get_next_clone_number() {
+    existing_clones=$(ls -1d "$chromium_dir/DefaultClone"* 2>/dev/null)
+    existing_numbers=($(echo "$existing_clones" | grep -oP '\d+' | sort -n))
+    next_number=1
+
+    for number in "${existing_numbers[@]}"; do
+        if [ "$number" -ne "$next_number" ]; then
+            break
+        fi
+        ((next_number++))
+    done
+
+    echo "$next_number"
+}
+
+desired_num_clones="$1"
+num_existing_clones=$(find "$chromium_dir" -maxdepth 1 -type d -name 'DefaultClone*' | wc -l)
+diff=$((desired_num_clones - num_existing_clones))
+
+# Create clones if needed
+for ((i=1; i<=diff; i++)); do
+    next_clone_number=$(get_next_clone_number)
+    clone_name="DefaultClone$next_clone_number"
+    clone_path="$chromium_dir/$clone_name"
+
+    # Clone the Default profile directory
+    cp -r "$default_profile" "$clone_path"
+    echo "Created clone: $clone_name"
+done

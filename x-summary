@@ -1,0 +1,91 @@
+#!/bin/bash
+
+# Get the current desktop (workspace) and total number of workspaces
+current_workspace=$(xdotool get_desktop)
+workspace_count=$(xprop -root _NET_NUMBER_OF_DESKTOPS | awk '{print $3}')
+workspace_labels=($(xprop -root _NET_DESKTOP_NAMES | awk -F '"' '{for (i=2; i<=NF; i+=2) print $i}'))
+
+seen_windows=()
+
+# Function to get all windows for a workspace
+get_windows_for_workspace() {
+  local workspace=$1
+  while read -r win_id; do
+    win_workspace=$(xprop -id "$win_id" _NET_WM_DESKTOP | awk '{print $3}')
+    if [[ "$win_workspace" == "$workspace" ]]; then
+      seen_windows+=("$win_id")
+      echo $win_id
+    fi
+  done < <(xdotool search --name --class --classname --role .)
+}
+
+# Function to print window details
+print_window_details() {
+  local window_ids=("$@")
+  for win_id in $window_ids; do
+    title=$(xdotool getwindowname "$win_id" 2>/dev/null || echo "N/A")
+    wm_class=$(xprop -id "$win_id" | awk -F '"' '/WM_CLASS/ {print $2 ", " $4}')
+    printf "%-12s %-30s %-40s\n" "$win_id" "$wm_class" "$title"
+  done
+}
+
+# Print header function
+print_header() {
+  local workspace=$1
+  local label=${workspace_labels[$workspace]:-"Workspace $workspace"}
+  if [[ "$workspace" == "$current_workspace" ]]; then
+    echo -e "$label (active):"
+  else
+    echo -e "\n$label:"
+  fi
+}
+
+# Flag to handle the first header output
+first_header=true
+
+# Main loop through workspaces
+for workspace in $(seq 0 $((workspace_count - 1))); do
+  windows=$(get_windows_for_workspace "$workspace")
+  
+  # Process each window ID directly
+  for win_id in $windows; do
+    seen_windows+=("$win_id")
+  done
+
+  # Check and process windows
+  if [[ -n "$windows" ]]; then
+    if $first_header; then
+      print_header "$workspace"
+      first_header=false
+    else
+      print_header "$workspace"
+    fi
+    echo "-----------------------------------------------------------------------------------"
+    print_window_details "${windows}"
+  fi
+done
+
+echo -e "\nOrphaned Windows:"
+echo "-----------------------------------------------------------------------------------"
+all_windows=$(xdotool search --name --class --classname --role .)
+for win_id in $all_windows; do
+  if [[ ! " ${seen_windows[@]} " =~ " $win_id " ]]; then
+    title=$(xdotool getwindowname "$win_id" 2>/dev/null || echo "N/A")
+    wm_class=$(xprop -id "$win_id" | awk -F '"' '/WM_CLASS/ {print $2 ", " $4}')
+    printf "%-12s %-30s %-40s\n" "$win_id" "$wm_class" "$title"
+  fi
+done
+
+
+echo -e "\nX11 Clients:"
+echo "-----------------------------------------------------------------------------------"
+# https://unix.stackexchange.com/a/700637
+sudo ss -x src "*/tmp/.X11-unix/*" |  # List X11 sessions
+  grep -Eo "[0-9]+\s*$" |             # Extract the port numbers from the output
+  parallel --will-cite -j 0 '         # Use GNU parallel to process each port concurrently
+    sudo ss -p -x |                   # List processes and sockets with their details
+    grep -w {} |                      # Find details for the specific port (placeholder {})
+    grep -v X11-unix                  # Exclude connections related to X11-unix
+  ' | grep -Eo '".+"' |               # Extract process names from the output
+  sort | uniq -c |                    # Count occurrences of each process
+  sort -rn                            # Sort processes by frequency in descending order

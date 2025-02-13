@@ -1,7 +1,33 @@
 #!/bin/bash
 
+for arg in "$@"; do
+    case "$arg" in
+        --interactive)
+            interactive=true
+            ;;
+        --restart)
+            restart=true
+            ;;
+    esac
+done
+
+# Interactive mode: Recompile, restart on success, and wait on failure
+if [ "$interactive" = true ]; then
+    if xmonad --recompile 2>&1 >/dev/null; then
+        echo "Recompile successful."
+        echo "Restarting xmonad..."
+        xmonad --restart
+    else
+        echo "Recompile failed. Press Enter to close."
+        read
+    fi
+    exit
+fi
+
+
+
 # https://stackoverflow.com/a/73271546
-tmp=$(mktemp -d)
+tmp=$(mktemp)
 touch $tmp/xmessage
 chmod +x $tmp/xmessage
 if PATH="$tmp:$PATH" xmonad --recompile; then
@@ -9,3 +35,4 @@ if PATH="$tmp:$PATH" xmonad --recompile; then
         xmonad --restart
     fi
 fi
+sudo rm -rf $tmp

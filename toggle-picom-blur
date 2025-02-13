@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Define the path to picom.conf
+dir="$HOME/.config"
+file="picom.conf"
+path="$dir/$file"
+
+# Check if the picom.conf file exists
+if [[ ! -f "$path" ]]; then
+    notify-send "File $path does not exist" && exit 0
+fi
+
+# Use awk to determine the current state and toggle
+current_state=$(awk '/{ blur-background =/ {print $4}' "$path" | tr -d '},')
+toggle-alacritty-transparent --on
+if [[ "$current_state" == "true" ]]; then
+    new_state="false"
+else
+    new_state="true"
+fi
+
+# Use sed to update the desired line
+sed -i "s/{ blur-background = $current_state }/{ blur-background = $new_state }/" "$path"

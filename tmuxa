@@ -7,7 +7,7 @@
 # ex.
 #  tmuxa mysession --dir=~/projects/myproject
 
-if [ $# -lt 1 ] || [ $# -gt 4 ]; then
+if [ $# -lt 1 ]; then
     echo "usage: tmuxa <session-name> [--dir=<dir>] [--no-layout] [--cmd=<cmd>]"
     exit 1
 fi

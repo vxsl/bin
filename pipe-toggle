@@ -1,0 +1,83 @@
+#!/bin/sh
+
+pipe_name="generic-pipe"
+indicator_on="x"
+indicator_off=" "
+custom_condition=""
+enable_command=""
+disable_command=""
+
+off="false"
+init="false"
+for arg in "$@"; do
+    case "$arg" in
+        --off)
+            off="true"
+            ;;
+        --init)
+            init="true"
+            ;;
+        --pipe=*)
+            pipe_name="${arg#*=}"
+            ;;
+        --on-indicator=*)
+            indicator_on="${arg#*=}"
+            ;;
+        --off-indicator=*)
+            indicator_off="${arg#*=}"
+            ;;
+        --condition=*)
+            custom_condition="${arg#*=}"
+            ;;
+        --enable=*)
+            enable_command="${arg#*=}"
+            ;;
+        --disable=*)
+            disable_command="${arg#*=}"
+            ;;
+    esac
+done
+
+if [ -z "$enable_command" ] || [ -z "$disable_command" ]; then
+    echo "Error: Both --enable and --disable arguments are required."
+    exit 1
+fi
+
+base_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+dir="$base_dir/.tmp"
+mkdir -p $dir
+pipe="$dir/$pipe_name"
+
+if [[ ! -p $pipe ]]; then
+    mkfifo $pipe
+fi
+
+do_it () {
+    export DISPLAY=:0.0
+
+    eval_result="false"
+    if [ -n "$custom_condition" ]; then
+        eval "$custom_condition"
+        eval_result=$?
+    fi
+
+
+    if [ "$eval_result" -eq 0 ] && [ "$off" = "false" ]; then
+        eval "$enable_command"
+        echo "$indicator_on" | tee $pipe | tee $pipe-copy
+    else
+        eval "$disable_command"
+        echo "$indicator_off" | tee $pipe | tee $pipe-copy
+    fi
+}
+
+if [ "$init" = "true" ]; then
+    if [ ! -f "$pipe-copy" ]; then
+        off=true
+        do_it
+    else
+        cat "$pipe-copy" | tee $pipe
+    fi
+else
+    do_it
+fi

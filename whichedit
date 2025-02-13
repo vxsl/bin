@@ -1,0 +1,18 @@
+#!/bin/bash
+
+args=()
+code="false"
+for arg in "$@"; do
+    if [ "$arg" != "--code" ]; then
+        args+=("$arg")
+    else 
+        code="true"  
+    fi
+done
+
+echo "${args[@]}" 
+if [ "$code" = "true" ]; then
+    which "${args[@]}" | xargs -I{} code -r {}
+else
+    which "${args[@]}" | xargs -I{} nvim {}
+fi

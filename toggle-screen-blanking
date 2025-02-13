@@ -1,0 +1,9 @@
+#!/bin/sh
+
+pipe-toggle \
+    --condition='xset q | grep "DPMS is Enabled"' \
+    --enable='xset s off; xset s noblank; xset -dpms' \
+    --disable='xset s on; xset s blank; xset +dpms' \
+    --on-indicator="x" \
+    --pipe="screen-blanking-status" \
+    "$@"

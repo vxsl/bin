@@ -1,0 +1,15 @@
+#!/bin/bash
+
+for arg in "$@"; do
+    case "$arg" in
+        --from-beginning)
+            from_beginning=true
+            ;;
+    esac
+done
+
+if [ "$from_beginning" = true ]; then
+    tail -F -n 999 $HOME/.xmonad-debug-log
+else 
+    tail -F -n 0 $HOME/.xmonad-debug-log
+fi
