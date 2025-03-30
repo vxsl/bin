@@ -8,7 +8,7 @@
 #  tmuxa mysession --dir=~/projects/myproject
 
 if [ $# -lt 1 ]; then
-    echo "usage: tmuxa <session-name> [--dir=<dir>] [--no-layout] [--cmd=<cmd>]"
+    echo "usage: tmuxa <session-name> [--dir=<dir>] [--no-layout] [--cmd=<cmd>] [--cmd=<cmd2>] [--cmd=<cmd3>] [--cmd=...]"
     exit 1
 fi
 
@@ -16,7 +16,7 @@ fi
 session_name="$1"
 no_layout=false
 dir="$HOME"
-cmd=""
+cmds=()  
 
 # Loop through the arguments to automatically assign variables
 for arg in "$@"; do
@@ -28,34 +28,50 @@ for arg in "$@"; do
             no_layout=true
             ;;
         --cmd=*)
-            cmd="${arg#--cmd=}"
+            cmds+=("${arg#--cmd=}") 
             ;;
     esac
 done
 
 cd $dir
 
-p2s="tmux-pane-view --pane-to-session"
-if [ -n "$cmd" ]; then
-    p2s="$p2s --cmd=\"$cmd\""
+if [ "$no_layout" = false ]; then
+    num_panes=4
+else
+    num_panes=${#cmds[@]}
 fi
+
+base_p2s="tmux-pane-view --pane-to-session"
+if [ -n "${cmds[*]}" ]; then
+    p2s_arr+=("$base_p2s --cmd=\"${cmds[0]}\"")
+    for cmd in "${cmds[@]:1}"; do
+        p2s_arr+=("$base_p2s --cmd=\"$cmd\"")
+    done
+else
+    p2s_arr=("$base_p2s")
+fi
+
+while [ ${#p2s_arr[@]} -lt $num_panes ]; do
+    p2s_arr+=("$base_p2s")
+done
 
 # If the session doesn't exist, create it and set up the layout
 if ! tmux has-session -t "$1" 2>/dev/null; then
     if [ "$no_layout" = false ]; then
-        tmux new-session -d -s "$1" $p2s \; \
-        split-window -v -l "90%" $p2s \; \
+        tmux new-session -d -s "$1" "${p2s_arr[1]}" \; \
+        split-window -v -l "90%" "${p2s_arr[0]}" \; \
         select-pane -t 0 \; \
-        split-window -h $p2s \; \
-        split-window -h $p2s \; \
+        split-window -h "${p2s_arr[2]}" \; \
+        split-window -h "${p2s_arr[3]}" \; \
         select-pane -t 3 \; \
-        setw window-active-style bg=black 
+        setw window-active-style bg=black
     else
-        tmux new-session -d -s "$1" "$p2s"
+        tmux new-session -d -s "$1" "${p2s_arr[0]}"
+        for cmd in "${p2s_arr[@]:1}"; do
+            tmux split-window -h "$cmd"
+        done
+        tmux select-layout -t "$1" tiled
     fi
-
-    sessions=$(tmux list-panes -a -F '#{pane_id} #{session_name}' | grep _child | awk '{print $2}')
-
 fi
 
 
